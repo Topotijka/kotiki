@@ -1,7 +1,7 @@
 package room
 
 import (
-	"kotiki/internal/peer"
+	"kotiki/internal/peer"	
 	"log"
 	"sync"
 
@@ -25,7 +25,7 @@ func (r *Room) RegisterPeer(ws *websocket.Conn) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	peer := peer.NewPeer(ws)
+	peer := peer.NewPeer(ws, r)
 	r.peers[peer.ID] = peer
 	peer.Listen()
 
@@ -39,8 +39,6 @@ func (r *Room) UnregisterPeer(peer *peer.Peer) {
 	delete(r.peers, peer.ID)
 	log.Println("Peer отключился. Осталось участников:", len(r.peers))
 }
-
-// Пересылка track'ов другим участникам (это основа SFU)
 func (r *Room) BroadcastTrack(track *webrtc.TrackRemote, senderID string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -49,6 +47,12 @@ func (r *Room) BroadcastTrack(track *webrtc.TrackRemote, senderID string) {
 		if id == senderID {
 			continue // не отправлять обратно отправителю
 		}
-		_ = peer.AddTrack(track)
+
+		// Добавляем трек для пересылки
+		if err := peer.AddTrack(track); err != nil {
+			log.Println("Ошибка добавления трека:", err)
+		}
 	}
 }
+// Пересылка track'ов другим участникам (это основа SFU)
+

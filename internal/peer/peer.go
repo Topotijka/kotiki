@@ -1,6 +1,7 @@
 package peer
 
 import (
+	
 	"log"
 
 	"github.com/google/uuid"
@@ -8,11 +9,18 @@ import (
 	"github.com/pion/webrtc/v4"
 )
 
+type Room interface{
+		BroadcastTrack(track *webrtc.TrackRemote, senderID string)
+
+}
+
 type Peer struct {
 	ID     string
 	Conn   *websocket.Conn
 	PC     *webrtc.PeerConnection
 	signal *Signal
+	localTracks map[string]*webrtc.TrackLocalStaticRTP
+	room Room
 }
 
 type Signal struct {
@@ -21,7 +29,10 @@ type Signal struct {
 	Candidate string `json:"candidate,omitempty"` // ICE кандидат
 }
 
-func NewPeer(conn *websocket.Conn) *Peer {
+func (p *Peer) GetRoom() Room {
+	return p.room
+}
+func NewPeer(conn *websocket.Conn, room Room) *Peer {
 
 	config := webrtc.Configuration{}
 
@@ -34,6 +45,8 @@ func NewPeer(conn *websocket.Conn) *Peer {
 		Conn:   conn,
 		PC:     pc,
 		signal: &Signal{},
+		localTracks: make(map[string]*webrtc.TrackLocalStaticRTP),
+		room:       room, 
 	}
 
 	return peer
@@ -68,12 +81,42 @@ func (p *Peer) handleSignalMessage() {
 	}
 }
 
+func (p *Peer) forwardTrack(localTrack *webrtc.TrackLocalStaticRTP, remoteTrack *webrtc.TrackRemote) {
+	buf := make([]byte, 1500) // Буфер для RTP пакетов
+
+	for {
+		// Чтение RTP пакетов из удаленного трека
+		n, _, err := remoteTrack.Read(buf)
+		if err != nil {
+			log.Println("Ошибка чтения RTP пакета:", err)
+			return
+		}
+
+		// Запись RTP пакетов в локальный трек
+		if _, err := localTrack.Write(buf[:n]); err != nil {
+			log.Println("Ошибка записи RTP пакета:", err)
+			return
+		}
+	}
+}
 // Добавление удаленного трека к Peer
 func (p *Peer) AddTrack(track *webrtc.TrackRemote) error {
 	localTrack, err := webrtc.NewTrackLocalStaticRTP(track.Codec().RTPCodecCapability, track.ID(), track.StreamID())
 	if err != nil {
 		return err
 	}
+
+	// Сохраняем локальный трек
+	p.localTracks[track.ID()] = localTrack
+
+	// Добавляем локальный трек в PeerConnection
 	_, err = p.PC.AddTrack(localTrack)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Запускаем пересылку данных
+	go p.forwardTrack(localTrack, track)
+
+	return nil
 }
