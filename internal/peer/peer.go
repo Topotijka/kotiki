@@ -33,22 +33,47 @@ func (p *Peer) GetRoom() Room {
 	return p.room
 }
 func NewPeer(conn *websocket.Conn, room Room) *Peer {
-
-	config := webrtc.Configuration{}
+	config := webrtc.Configuration{
+    ICEServers: []webrtc.ICEServer{
+        {
+            URLs: []string{"stun:stun.l.google.com:19302"}, // STUN сервер
+        },
+        // Добавьте TURN сервер, если нужен
+        // { urls: 'turn:your-turn-server.com', username: 'user', credential: 'pass' }
+    },
+}
 
 	pc, err := webrtc.NewPeerConnection(config)
 	if err != nil {
-		log.Println("cant create peer conn")
+		log.Println("Ошибка создания PeerConnection:", err)
+		return nil
 	}
 	peer := &Peer{
-		ID:     uuid.New().String(),
-		Conn:   conn,
-		PC:     pc,
-		signal: &Signal{},
+		ID:         uuid.New().String(),
+		Conn:       conn,
+		PC:         pc,
+		signal:     &Signal{},
 		localTracks: make(map[string]*webrtc.TrackLocalStaticRTP),
-		room:       room, 
+		room:       room,
 	}
 
+	// Обработка входящих треков
+	pc.OnTrack(func(track *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
+		log.Println("Получен трек:", track.ID(), track.Kind())
+
+		// Пересылка трека другим клиентам
+		if room != nil {
+			room.BroadcastTrack(track, peer.ID)
+		}
+	})
+
+	// Отслеживание состояния ICE соединения
+	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
+		log.Printf("Состояние ICE соединения: %s\n", state.String())
+	})
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		log.Printf("Состояние соединения: %s\n", state.String())
+	})
 	return peer
 }
 

@@ -7,7 +7,7 @@ import (
 )
 
 func (p *Peer) handleAnwser() {
-	log.Println("ans")
+	
 
 	answer := webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: p.signal.SDP}
 	err := p.PC.SetRemoteDescription(answer)

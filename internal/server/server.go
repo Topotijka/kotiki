@@ -3,6 +3,7 @@ package server
 import (
 	"kotiki/internal/room"
 	"log"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -31,7 +32,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer wsConn.Close()
-
+	fmt.Println("новый ws ура")
 	s.Room.RegisterPeer(wsConn)
 
 }
