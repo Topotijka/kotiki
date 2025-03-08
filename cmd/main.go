@@ -1,14 +1,15 @@
 package main
 
 import (
-	"kotiki/internal"
+	"kotiki/internal/room"
+	"kotiki/internal/server"
 	"log"
 	"net/http"
 )
 
 func main() {
-	room := internal.NewRoom()         // создаем единственную комнату
-	server := internal.NewServer(room) // создаем сервер
+	room := room.NewRoom()           // создаем единственную комнату
+	server := server.NewServer(room) // создаем сервер
 
 	http.HandleFunc("/ws", server.HandleWebSocket)
 
