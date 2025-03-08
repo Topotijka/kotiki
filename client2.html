@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client 2</title>
+    <script src="https://cdn.jsdelivr.net/npm/uuid"></script>
+</head>
+<body>
+    <h2>WebRTC Client 2</h2>
+    <button onclick="startConnection()">Start WebRTC Connection</button>
+
+    <script>
+        const wsUrl = "ws://localhost:8080/ws";
+        const ws = new WebSocket(wsUrl);
+        let pc;
+        let uuid = uuid.v4();
+
+        ws.onopen = () => {
+            console.log('Connected to WebSocket');
+        };
+
+        ws.onmessage = (message) => {
+            const signal = JSON.parse(message.data);
+            handleSignal(signal);
+        };
+
+        function startConnection() {
+            pc = new RTCPeerConnection();
+
+            pc.onicecandidate = (event) => {
+                if (event.candidate) {
+                    sendSignal({ type: 'candidate', candidate: event.candidate.candidate });
+                }
+            };
+
+            pc.createAnswer()
+                .then(answer => {
+                    return pc.setLocalDescription(answer);
+                })
+                .then(() => {
+                    sendSignal({
+                        type: 'answer',
+                        sdp: pc.localDescription.sdp
+                    });
+                })
+                .catch(error => console.error('Error creating answer:', error));
+        }
+
+        function handleSignal(signal) {
+            if (signal.type === 'offer') {
+                const offer = new RTCSessionDescription({ type: 'offer', sdp: signal.sdp });
+                pc.setRemoteDescription(offer)
+                    .then(() => {
+                        pc.createAnswer()
+                            .then(answer => {
+                                return pc.setLocalDescription(answer);
+                            })
+                            .then(() => {
+                                sendSignal({
+                                    type: 'answer',
+                                    sdp: pc.localDescription.sdp
+                                });
+                            })
+                            .catch(error => console.error('Error creating answer:', error));
+                    })
+                    .catch(error => console.error('Error setting remote description:', error));
+            }
+
+            if (signal.type === 'candidate') {
+                const candidate = new RTCIceCandidate({ candidate: signal.candidate });
+                pc.addIceCandidate(candidate)
+                    .catch(error => console.error('Error adding ICE candidate:', error));
+            }
+        }
+
+        function sendSignal(signal) {
+            signal.peerId = uuid;
+            ws.send(JSON.stringify(signal));
+        }
+    </script>
+</body>
+</html>
