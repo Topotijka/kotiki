@@ -33,15 +33,7 @@ func (p *Peer) GetRoom() Room {
 	return p.room
 }
 func NewPeer(conn *websocket.Conn, room Room) *Peer {
-	config := webrtc.Configuration{
-    ICEServers: []webrtc.ICEServer{
-        {
-            URLs: []string{"stun:stun.l.google.com:19302"}, // STUN сервер
-        },
-        // Добавьте TURN сервер, если нужен
-        // { urls: 'turn:your-turn-server.com', username: 'user', credential: 'pass' }
-    },
-}
+	config := webrtc.Configuration{}
 
 	pc, err := webrtc.NewPeerConnection(config)
 	if err != nil {
@@ -71,7 +63,7 @@ func NewPeer(conn *websocket.Conn, room Room) *Peer {
 	pc.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		log.Printf("Состояние ICE соединения: %s\n", state.String())
 	})
-	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
 		log.Printf("Состояние соединения: %s\n", state.String())
 	})
 	return peer
@@ -107,7 +99,7 @@ func (p *Peer) handleSignalMessage() {
 }
 
 func (p *Peer) forwardTrack(localTrack *webrtc.TrackLocalStaticRTP, remoteTrack *webrtc.TrackRemote) {
-	buf := make([]byte, 1500) // Буфер для RTP пакетов
+	buf := make([]byte, 3000) // Буфер для RTP пакетов
 
 	for {
 		// Чтение RTP пакетов из удаленного трека
